@@ -7,47 +7,17 @@ from utils import Autograder, ASSIGNMENT_DIR
 import os
 import subprocess
 import re
-import tempfile
 
 # ==============================================================================
-# 编译学生代码
+# 配置
 # ==============================================================================
 
 EXECUTABLE = os.path.join(ASSIGNMENT_DIR, "student_code")
 SOURCE_FILE = os.path.join(ASSIGNMENT_DIR, "main.cpp")
 
 
-def compile_student_code():
-    """编译学生代码"""
-    result = subprocess.run(
-        ["g++", "-std=c++11", "-pthread", "-o", EXECUTABLE, SOURCE_FILE,
-         "-DTEST_MODE"],  # 定义测试模式宏
-        capture_output=True,
-        text=True,
-        cwd=ASSIGNMENT_DIR
-    )
-    if result.returncode != 0:
-        raise AssertionError(f"编译失败:\n{result.stderr}")
-
-
 # ==============================================================================
-# 测试辅助函数
-# ==============================================================================
-
-def run_test_binary(test_name: str, timeout: int = 30) -> str:
-    """运行测试二进制文件并返回输出"""
-    result = subprocess.run(
-        [EXECUTABLE, test_name],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        cwd=ASSIGNMENT_DIR
-    )
-    return result.stdout + result.stderr, result.returncode
-
-
-# ==============================================================================
-# 生成测试二进制
+# 测试代码模板
 # ==============================================================================
 
 TEST_CODE = '''
@@ -56,7 +26,7 @@ TEST_CODE = '''
 #include <vector>
 #include <mutex>
 #include <sstream>
-#include <chrono>
+#include <algorithm>
 #include <cstring>
 
 // 学生代码中的声明
@@ -65,47 +35,44 @@ extern int g_result;
 extern std::mutex g_counter_mutex;
 extern int g_counter;
 
-void thread_hello(int thread_id);
+void create_threads();
 void compute_sum(int a, int b);
 void increment_safe(int iterations);
 void increment_unsafe(int iterations);
 
 // ==============================================================================
-// 测试 1: thread_hello
+// 测试 1: create_threads
 // ==============================================================================
 
-int test_thread_hello() {
-    std::vector<std::ostringstream> outputs(5);
-    std::vector<std::thread> threads;
-    std::mutex cout_mutex;
+int test_create_threads() {
+    // 重定向 cout 捕获输出
+    std::ostringstream captured;
+    std::streambuf* old_cout = std::cout.rdbuf(captured.rdbuf());
 
-    for (int i = 0; i < 5; ++i) {
-        threads.emplace_back([i, &outputs, &cout_mutex]() {
-            // 重定向 cout 到 ostringstream
-            std::streambuf* old = std::cout.rdbuf(outputs[i].rdbuf());
-            thread_hello(i);
-            std::cout.rdbuf(old);
-        });
-    }
+    create_threads();
 
-    for (auto& t : threads) {
-        t.join();
-    }
+    std::cout.rdbuf(old_cout);
 
-    // 验证输出
-    int passed = 0;
+    std::string output = captured.str();
+
+    // 检查是否包含所有 5 个线程的输出
+    std::vector<bool> found(5, false);
     for (int i = 0; i < 5; ++i) {
         std::string expected = "Hello from thread " + std::to_string(i);
-        if (outputs[i].str().find(expected) != std::string::npos) {
-            passed++;
+        if (output.find(expected) != std::string::npos) {
+            found[i] = true;
         }
     }
 
-    if (passed == 5) {
-        std::cout << "PASS: 所有 5 个线程正确打印了消息" << std::endl;
+    int count = std::count(found.begin(), found.end(), true);
+
+    if (count == 5) {
+        std::cout << "PASS: 成功创建 5 个线程并正确打印消息" << std::endl;
         return 0;
     } else {
-        std::cout << "FAIL: 只有 " << passed << "/5 个线程正确打印了消息" << std::endl;
+        std::cout << "FAIL: 只找到 " << count << "/5 个正确的线程输出" << std::endl;
+        std::cout << "期望输出包含: Hello from thread 0, Hello from thread 1, ..., Hello from thread 4" << std::endl;
+        std::cout << "实际输出:\\n" << output << std::endl;
         return 1;
     }
 }
@@ -202,8 +169,8 @@ int main(int argc, char* argv[]) {
 
     std::string test_name = argv[1];
 
-    if (test_name == "thread_hello") {
-        return test_thread_hello();
+    if (test_name == "create_threads") {
+        return test_create_threads();
     } else if (test_name == "compute_sum") {
         return test_compute_sum();
     } else if (test_name == "increment_safe") {
@@ -216,6 +183,10 @@ int main(int argc, char* argv[]) {
 '''
 
 
+# ==============================================================================
+# 测试环境
+# ==============================================================================
+
 def setup_test_environment():
     """准备测试环境: 编译学生代码和测试代码"""
     # 写入测试代码
@@ -223,24 +194,28 @@ def setup_test_environment():
     with open(test_file, "w") as f:
         f.write(TEST_CODE)
 
-    # 提取学生代码 (不包含 main 函数和 #include "autograder/utils.cpp")
+    # 读取学生代码
     with open(SOURCE_FILE, "r") as f:
         student_code = f.read()
 
     # 移除 main 函数和 autograder include
     student_code = re.sub(r'#include\s+"autograder/utils\.cpp"', '', student_code)
-    student_code = re.sub(r'int\s+main\s*\(\s*\)\s*\{[^}]*return\s+run_autograder\s*\(\s*\)\s*;[^}]*\}', '', student_code)
+    student_code = re.sub(
+        r'int\s+main\s*\(\s*\)\s*\{[^}]*return\s+run_autograder\s*\(\s*\)\s*;[^}]*\}',
+        '',
+        student_code
+    )
 
     # 写入处理后的学生代码
     student_file = os.path.join(ASSIGNMENT_DIR, "autograder", "student_impl.cpp")
     with open(student_file, "w") as f:
         f.write(student_code)
 
-    # 编译: 将学生代码和测试代码链接
+    # 编译
     combined_source = os.path.join(ASSIGNMENT_DIR, "autograder", "combined_test.cpp")
     with open(combined_source, "w") as f:
-        f.write(f'#include "student_impl.cpp"\n')
-        f.write(f'#include "test_runner.cpp"\n')
+        f.write('#include "student_impl.cpp"\n')
+        f.write('#include "test_runner.cpp"\n')
 
     result = subprocess.run(
         ["g++", "-std=c++11", "-pthread", "-o", EXECUTABLE, combined_source],
@@ -269,13 +244,25 @@ def cleanup_test_environment():
     return True
 
 
+def run_test_binary(test_name: str, timeout: int = 30) -> tuple:
+    """运行测试二进制文件并返回输出"""
+    result = subprocess.run(
+        [EXECUTABLE, test_name],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=ASSIGNMENT_DIR
+    )
+    return result.stdout + result.stderr, result.returncode
+
+
 # ==============================================================================
 # 测试函数
 # ==============================================================================
 
-def test_thread_hello():
-    """测试练习 1: thread_hello 函数"""
-    output, returncode = run_test_binary("thread_hello")
+def test_create_threads():
+    """测试练习 1: create_threads 函数"""
+    output, returncode = run_test_binary("create_threads")
     if returncode != 0:
         raise AssertionError(output.strip())
     return True
@@ -306,7 +293,7 @@ if __name__ == "__main__":
     grader.setup = setup_test_environment
     grader.teardown = cleanup_test_environment
 
-    grader.add_part("练习 1: 创建多个线程 (thread_hello)", test_thread_hello)
+    grader.add_part("练习 1: 创建多个线程 (create_threads)", test_create_threads)
     grader.add_part("练习 2: 参数传递 (compute_sum)", test_compute_sum)
     grader.add_part("练习 3: 修复数据竞争 (increment_safe)", test_increment_safe)
 

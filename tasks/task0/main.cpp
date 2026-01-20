@@ -8,25 +8,44 @@
  *   请在标记 "TODO" 的地方填写代码，完成后运行程序验证你的实现。
  */
 
+#include "autograder/utils.cpp"
 #include <iostream>
+#include <mutex>
 #include <thread>
 #include <vector>
-#include <mutex>
-#include "autograder/utils.cpp"
 
 // ============================================================
 // 练习 1: 创建多个线程
 //
-// 任务: 编写函数 thread_hello，让每个线程打印 "Hello from thread X"
-//       其中 X 是传入的线程编号 (0-4)
+// 任务: 实现 create_threads 函数
+//   1. 创建 5 个线程
+//   2. 每个线程打印 "Hello from thread X" (X 是 0-4)
+//   3. 等待所有线程完成 (使用 join)
 //
-// 提示: 使用 std::cout 打印，格式: "Hello from thread 0"
+// 提示:
+//   - 使用 std::vector<std::thread> 存储线程
+//   - 可以使用 lambda 表达式或普通函数作为线程函数
+//   - 记得对每个线程调用 join()
 // ============================================================
+std::mutex cout_mtx;
+void create_threads()
+{
+    // TODO: 创建 5 个线程，每个打印 "Hello from thread X"
+    // 然后等待所有线程完成
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 5; i++)
+    {
+        threads.emplace_back([](int pid)
+                             {
+                                 std::lock_guard<std::mutex> lock(cout_mtx);
+                                 std::cout << "Hello from thread " << pid << std::endl; },
+                             i);
+    }
 
-void thread_hello(int thread_id) {
-    // TODO: 打印 "Hello from thread X"，X 是 thread_id
-    // 格式必须是: "Hello from thread 0" (含换行)
-
+    for (auto &thread : threads)
+    {
+        thread.join();
+    }
 }
 
 // ============================================================
@@ -41,10 +60,10 @@ void thread_hello(int thread_id) {
 std::mutex g_mutex;
 int g_result = 0;
 
-void compute_sum(int a, int b) {
-    // TODO: 计算 a + b，并将结果存储到 g_result 中
-    // 注意: 必须使用 g_mutex 保护对 g_result 的访问
-
+void compute_sum(int a, int b)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    g_result = a + b;
 }
 
 // ============================================================
@@ -60,22 +79,30 @@ std::mutex g_counter_mutex;
 int g_counter = 0;
 
 // 不安全版本 (仅供参考，不要修改)
-void increment_unsafe(int iterations) {
-    for (int i = 0; i < iterations; ++i) {
-        ++g_counter;  // 数据竞争!
+void increment_unsafe(int iterations)
+{
+    for (int i = 0; i < iterations; ++i)
+    {
+        ++g_counter; // 数据竞争!
     }
 }
 
-void increment_safe(int iterations) {
+void increment_safe(int iterations)
+{
     // TODO: 使用 g_counter_mutex 保护对 g_counter 的访问
     // 循环 iterations 次，每次对 g_counter 加 1
-
+    for (int i = 0; i < iterations; ++i)
+    {
+        std::lock_guard<std::mutex> lock(g_counter_mutex);
+        ++g_counter; // 数据竞争!
+    }
 }
 
 // ============================================================
 // 主函数 - 运行自动测试
 // ============================================================
 
-int main() {
+int main()
+{
     return run_autograder();
 }
