@@ -1,0 +1,27 @@
+# 编译产物
+*.o
+*.out
+main
+student_code
+
+# Python 虚拟环境 (autograder 运行时生成)
+**/autograder/bin/
+**/autograder/lib/
+**/autograder/lib64
+**/autograder/include/
+**/autograder/__pycache__/
+**/autograder/pyvenv.cfg
+
+# 测试运行时生成的临时文件
+**/autograder/test_runner.cpp
+**/autograder/student_impl.cpp
+**/autograder/combined_test.cpp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
