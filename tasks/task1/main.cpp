@@ -9,10 +9,10 @@
  */
 
 #include "../common/utils.cpp"
-#include <functional>
-#include <thread>
-#include <iostream>
 #include <chrono>
+#include <functional>
+#include <iostream>
+#include <thread>
 
 // ============================================================
 // Thread 类定义
@@ -24,7 +24,8 @@
 // 4. 提供 getId() 获取线程 ID
 // ============================================================
 
-class Thread {
+class Thread
+{
 public:
     using ThreadFunc = std::function<void(int)>;
 
@@ -40,8 +41,7 @@ public:
     // ============================================================
     Thread(ThreadFunc func)
         // TODO: 实现初始化列表
-        // : func_(...)
-        // , threadId_(...)
+        : func_(func), threadId_(++generateId_)
     {
         // TODO: 如果需要，在构造函数体中添加代码
     }
@@ -58,7 +58,10 @@ public:
     //   - 使用 detach() 让线程在后台运行
     //   - 线程池场景中使用 detach 是因为工作线程是长期运行的
     // ============================================================
-    void start() {
+    void start()
+    {
+        std::thread t(func_, threadId_);
+        t.detach();
         // TODO: 实现线程启动逻辑
         // 1. 创建 std::thread 对象
         // 2. 调用 detach()
@@ -69,9 +72,11 @@ public:
     //
     // 任务: 返回线程的唯一 ID
     // ============================================================
-    int getId() const {
+    int getId() const
+    {
+        
         // TODO: 返回 threadId_
-        return 0;  // 修改这行
+        return threadId_; // 修改这行
     }
 
 private:
@@ -91,13 +96,13 @@ private:
 // ============================================================
 
 // TODO: 定义 Thread::generateId_
-// int Thread::generateId_ = ...;
-
+int Thread::generateId_ = 0;
 
 // ============================================================
 // 主函数 - 运行自动测试
 // ============================================================
 
-int main() {
+int main()
+{
     return run_autograder();
 }

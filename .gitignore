@@ -12,6 +12,15 @@ student_code
 **/autograder/__pycache__/
 **/autograder/pyvenv.cfg
 
+# Python 虚拟环境 (common 目录)
+tasks/common/bin/
+tasks/common/lib/
+tasks/common/lib64
+tasks/common/include/
+tasks/common/__pycache__/
+tasks/common/pyvenv.cfg
+tasks/common/*.pyc
+
 # 测试运行时生成的临时文件
 **/autograder/test_runner.cpp
 **/autograder/student_impl.cpp

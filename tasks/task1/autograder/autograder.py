@@ -7,7 +7,7 @@ import os
 
 # 引用公共模块
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'common'))
-from utils import Autograder, ASSIGNMENT_DIR
+from utils import Autograder
 
 import subprocess
 import re
@@ -17,6 +17,8 @@ import time
 # 配置
 # ==============================================================================
 
+# Override ASSIGNMENT_DIR to point to the task1 directory
+ASSIGNMENT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 EXECUTABLE = os.path.join(ASSIGNMENT_DIR, "student_code")
 SOURCE_FILE = os.path.join(ASSIGNMENT_DIR, "main.cpp")
 
